@@ -1,0 +1,33 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/product_db
+    username: postgres
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 1s
+      connect-timeout: 1s
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    org.hibernate.SQL: debug

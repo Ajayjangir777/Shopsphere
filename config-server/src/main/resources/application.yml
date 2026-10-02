@@ -1,0 +1,13 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native          # read from classpath/filesystem instead of Git
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/configs
