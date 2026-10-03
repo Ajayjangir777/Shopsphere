@@ -1,0 +1,54 @@
+server:
+  port: 8080
+
+spring:
+  data:
+    redis:                      # used by the rate limiter
+      host: localhost
+      port: 6379
+      timeout: 1s
+      connect-timeout: 1s
+
+  cloud:
+    gateway:
+      # Timeouts for calls from the gateway to downstream services.
+      httpclient:
+        connect-timeout: 2000   # ms to establish a connection
+        response-timeout: 5s    # max time to wait for a response
+
+      # We declare routes explicitly instead of auto-exposing every
+      # registered service (discovery.locator), so nothing is public by accident.
+      discovery:
+        locator:
+          enabled: false
+
+      # Applied to every route.
+      default-filters:
+        # Avoid duplicate CORS headers if a downstream service ever adds its own.
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+
+      # CORS is handled here once, so individual services don't need it.
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:3000"   # React (Create React App)
+              - "http://localhost:5173"   # React (Vite)
+            allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowedHeaders: "*"
+            exposedHeaders: [X-Correlation-Id, X-RateLimit-Remaining]
+            allowCredentials: true        # needed later for cookies / auth headers
+            maxAge: 3600                  # browsers may cache the preflight for 1h
+
+      routes:
+        - id: product-service
+          uri: lb://product-service       # logical name from Eureka, load balanced
+          predicates:
+            - Path=/api/v1/products/**    # match requests with this path
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10   # tokens added per second
+                redis-rate-limiter.burstCapacity: 20   # bucket size (max burst)
+                redis-rate-limiter.requestedTokens: 1  # cost of one request
+                key-resolver: "#{@ipKeyResolver}"      # bean that picks the bucket key
