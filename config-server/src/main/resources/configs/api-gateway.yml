@@ -52,3 +52,15 @@ spring:
                 redis-rate-limiter.burstCapacity: 20   # bucket size (max burst)
                 redis-rate-limiter.requestedTokens: 1  # cost of one request
                 key-resolver: "#{@ipKeyResolver}"      # bean that picks the bucket key
+
+        - id: auth-register
+          uri: lb://auth-server
+          predicates:
+            - Path=/api/auth/register     # only the sign-up path is exposed, not the whole auth server
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 1    # 1 attempt per second sustained
+                redis-rate-limiter.burstCapacity: 5    # up to 5 quick attempts
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@registerKeyResolver}"

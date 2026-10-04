@@ -1,0 +1,27 @@
+server:
+  port: 9000
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/auth_db
+    username: postgres
+    password: root            # DEV ONLY: production uses AWS Secrets Manager
+  jpa:
+    hibernate:
+      ddl-auto: validate         # Flyway owns the schema
+    open-in-view: false
+  flyway:
+    enabled: true
+
+# Our own settings, bound to AuthProperties
+auth:
+  # Must be EXACTLY what resource servers configure as their issuer
+  issuer: http://localhost:9000
+  # Secret of the machine-to-machine client. DEV ONLY value.
+  service-client-secret: service-secret-change-me
+  # Where the React app may be sent back to after login (exact match required)
+  web-redirect-uris:
+    - http://localhost:3000/callback
+    - http://localhost:5173/callback
+  # Creates demo users "admin" and "customer" on startup. MUST be false in production.
+  seed-demo-users: true

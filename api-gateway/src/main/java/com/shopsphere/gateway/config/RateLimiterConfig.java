@@ -4,6 +4,7 @@ package com.shopsphere.gateway.config;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;
@@ -28,11 +29,27 @@ public class RateLimiterConfig {
      * @return a resolver that maps a request to the caller's IP, or "unknown"
      */
     @Bean
+    @Primary
     public KeyResolver ipKeyResolver() {
         return exchange -> Mono.just(
                 Optional.ofNullable(exchange.getRequest().getRemoteAddress())
                         .map(address -> address.getAddress().getHostAddress())
                         .orElse("unknown"));
+    }
+
+    /**
+     * Identifies a caller for the sign-up route. The "register:" prefix gives it its own
+     * bucket in Redis, separate from the product browsing bucket for the same IP, so
+     * browsing the catalog can never use up someone's sign-up allowance (or the reverse).
+     *
+     * @return a resolver that maps a request to "register:" plus the caller's IP
+     */
+    @Bean
+    public KeyResolver registerKeyResolver() {
+        return exchange -> Mono.just("register:" + Optional
+                .ofNullable(exchange.getRequest().getRemoteAddress())
+                .map(address -> address.getAddress().getHostAddress())
+                .orElse("unknown"));
     }
 
 }
