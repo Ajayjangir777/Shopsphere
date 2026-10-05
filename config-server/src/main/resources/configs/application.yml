@@ -12,3 +12,10 @@ management:
     web:
       exposure:
         include: health,info
+
+logging:
+  pattern:
+    # Adds the correlation ID from the MDC to every log line.
+    # Note: no ${...} placeholders here, because the Config Server would try to
+    # resolve them itself before sending the file to the client.
+    level: "%5p [%X{correlationId:-}]"

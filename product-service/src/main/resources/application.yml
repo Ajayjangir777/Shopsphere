@@ -20,12 +20,13 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
-    data:
-      redis:
-        host: ${REDIS_HOST:localhost}
-        port: ${REDIS_PORT:6379}
-        timeout: 1s
-        connect-timeout: 1s
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 1s
+      connect-timeout: 1s
 
   flyway:
     enabled: true
