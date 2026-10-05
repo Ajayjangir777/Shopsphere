@@ -9,58 +9,55 @@ spring:
       timeout: 1s
       connect-timeout: 1s
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9000   # same value the Auth Server uses as its issuer
+
   cloud:
     gateway:
-      # Timeouts for calls from the gateway to downstream services.
       httpclient:
-        connect-timeout: 2000   # ms to establish a connection
-        response-timeout: 5s    # max time to wait for a response
+        connect-timeout: 2000
+        response-timeout: 5s
 
-      # We declare routes explicitly instead of auto-exposing every
-      # registered service (discovery.locator), so nothing is public by accident.
       discovery:
         locator:
-          enabled: false
+          enabled: false        # only explicitly declared routes are exposed
 
-      # Applied to every route.
       default-filters:
-        # Avoid duplicate CORS headers if a downstream service ever adds its own.
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
 
-      # CORS is handled here once, so individual services don't need it.
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins:
-              - "http://localhost:3000"   # React (Create React App)
-              - "http://localhost:5173"   # React (Vite)
-            allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-            allowedHeaders: "*"
-            exposedHeaders: [X-Correlation-Id, X-RateLimit-Remaining]
-            allowCredentials: true        # needed later for cookies / auth headers
-            maxAge: 3600                  # browsers may cache the preflight for 1h
+      # NOTE: "globalcors" was removed. CORS is now handled by Spring Security
+      # (see GatewaySecurityConfig) so that even 401 responses carry CORS headers.
 
       routes:
         - id: product-service
-          uri: lb://product-service       # logical name from Eureka, load balanced
+          uri: lb://product-service
           predicates:
-            - Path=/api/v1/products/**    # match requests with this path
+            - Path=/api/v1/products/**
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 10   # tokens added per second
-                redis-rate-limiter.burstCapacity: 20   # bucket size (max burst)
-                redis-rate-limiter.requestedTokens: 1  # cost of one request
-                key-resolver: "#{@ipKeyResolver}"      # bean that picks the bucket key
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
 
         - id: auth-register
           uri: lb://auth-server
           predicates:
-            - Path=/api/auth/register     # only the sign-up path is exposed, not the whole auth server
+            - Path=/api/auth/register
           filters:
             - name: RequestRateLimiter
               args:
-                redis-rate-limiter.replenishRate: 1    # 1 attempt per second sustained
-                redis-rate-limiter.burstCapacity: 5    # up to 5 quick attempts
+                redis-rate-limiter.replenishRate: 1
+                redis-rate-limiter.burstCapacity: 5
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@registerKeyResolver}"
+
+# Our own settings, read by GatewaySecurityConfig. Comma-separated list of origins
+# (web pages) allowed to call the API from a browser.
+gateway:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:5173

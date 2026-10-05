@@ -24,6 +24,14 @@ spring:
       timeout: 1s
       connect-timeout: 1s
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Must match the "iss" claim in tokens EXACTLY. On first use the service downloads
+          # the discovery document from here, finds the JWKS URL, and caches the public keys.
+          issuer-uri: http://localhost:9000
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
