@@ -1,9 +1,8 @@
 package com.shopsphere.product.controller;
 
+import com.shopsphere.common.web.CommonWebAutoConfiguration;
 import com.shopsphere.product.dto.PageResponse;
 import com.shopsphere.product.dto.ProductResponse;
-import com.shopsphere.product.exception.GlobalExceptionHandler;
-import com.shopsphere.product.security.JsonSecurityErrorHandler;
 import com.shopsphere.product.config.SecurityConfig;
 import com.shopsphere.product.service.ProductService;
 import org.junit.jupiter.api.Test;
@@ -40,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * tokens are simulated with Spring Security's test support.
  */
 @WebMvcTest(ProductController.class)
-@Import({SecurityConfig.class, JsonSecurityErrorHandler.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, CommonWebAutoConfiguration.class})
 public class ProductControllerSecurityTest {
 
     private static final String VALID_BODY = """

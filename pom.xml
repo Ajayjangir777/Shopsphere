@@ -28,6 +28,9 @@
         <module>config-server</module>
         <module>api-gateway</module>
         <module>auth-server</module>
+        <module>common-web</module>
+        <module>user-service</module>
+        <module>order-service</module>
     </modules>
 
     <dependencyManagement>

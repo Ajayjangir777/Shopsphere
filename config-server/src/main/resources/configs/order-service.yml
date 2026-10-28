@@ -1,0 +1,30 @@
+server:
+  port: 8083
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/order_db
+    username: postgres
+    password: root            # DEV ONLY
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9000
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:                  # applies to every Feign client
+            connect-timeout: 2000   # ms to open a connection
+            read-timeout: 4000      # ms to wait for a response
+            logger-level: basic     # log method, URL, status, duration
+logging:
+  level:
+    com.shopsphere.order.client: DEBUG   # makes the Feign log lines visible
+    org.hibernate.SQL: debug

@@ -1,6 +1,7 @@
 package com.shopsphere.product.config;
 
-import com.shopsphere.product.security.JsonSecurityErrorHandler;
+import com.shopsphere.common.web.JsonSecurityErrorHandler;
+import com.shopsphere.common.web.ResourceServerSupport;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -30,72 +31,16 @@ import java.util.List;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
-
-    /**
-     * Defines which requests are public and which need a token.
-     *
-     * <p>This URL-level layer is the coarse rule (default deny); the fine-grained role
-     * checks live on the controller methods as {@code @RequiresShopAdmin}.
-     *
-     * @param http         the security builder
-     * @param errorHandler writes the JSON bodies for 401 and 403
-     * @param converter    turns a verified JWT into Spring authorities
-     * @return the configured filter chain
-     * @throws Exception if the configuration is invalid
-     */
+    /** Public: catalog reads, health, API docs. Everything else needs a valid token. */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http,
-                                           JsonSecurityErrorHandler errorHandler,
+    public SecurityFilterChain filterChain(HttpSecurity http, JsonSecurityErrorHandler errorHandler,
                                            JwtAuthenticationConverter converter) throws Exception {
-        http
-                // Tokens travel in an Authorization header that browsers do NOT attach
-                // automatically, so there is no CSRF risk and no session is needed.
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        // DEV convenience: API docs open. Restrict or remove in production.
-                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
-                        // Browsing the catalog needs no login.
-                        .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
-                        .anyRequest().authenticated())
-                // 401 / 403 for requests that reach the authorization step without a token or permission.
-                .exceptionHandling(handling -> handling
-                        .authenticationEntryPoint(errorHandler)
-                        .accessDeniedHandler(errorHandler))
-                // Validate Bearer JWTs; the same JSON handler covers bad or expired tokens.
-                .oauth2ResourceServer(oauth -> oauth
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
-                        .authenticationEntryPoint(errorHandler)
-                        .accessDeniedHandler(errorHandler));
-
+        ResourceServerSupport.apply(http, errorHandler, converter);
+        http.authorizeHttpRequests(authorize -> authorize
+                .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
+                .anyRequest().authenticated());
         return http.build();
-    }
-
-    /**
-     * Maps JWT claims to Spring Security authorities:
-     * <ul>
-     *   <li>each scope "shop.write" becomes {@code SCOPE_shop.write}</li>
-     *   <li>each entry of our custom "roles" claim, e.g. "ADMIN", becomes {@code ROLE_ADMIN}</li>
-     * </ul>
-     * Those prefixes are what {@code hasAuthority(...)} and {@code hasRole(...)} look for.
-     *
-     * @return the converter used after a token has been verified
-     */
-    @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter scopeConverter = new JwtGrantedAuthoritiesConverter();
-
-        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            Collection<GrantedAuthority> authorities = new ArrayList<>(scopeConverter.convert(jwt));
-
-            List<String> roles = jwt.getClaimAsStringList("roles");   // null for machine tokens
-            if (roles != null) {
-                roles.forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
-            }
-            return authorities;
-        });
-        return converter;
     }
 }

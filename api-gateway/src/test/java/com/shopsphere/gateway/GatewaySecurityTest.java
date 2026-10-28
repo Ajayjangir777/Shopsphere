@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -36,6 +37,9 @@ public class GatewaySecurityTest {
     /** Teaches the fake decoder one good token and one bad one. */
     @BeforeEach
     void stubDecoder() {
+        // The first request on a cold gateway can exceed WebTestClient's 5s default timeout.
+        client = client.mutate().responseTimeout(Duration.ofSeconds(30)).build();
+
         Jwt jwt = Jwt.withTokenValue("good-token")
                 .header("alg", "RS256")
                 .subject("customer")

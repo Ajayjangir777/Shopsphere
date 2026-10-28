@@ -56,6 +56,35 @@ spring:
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@registerKeyResolver}"
 
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+              - Path=/api/v1/users/**
+          filters:
+              - name: RequestRateLimiter
+                args:
+                  redis-rate-limiter.replenishRate: 10
+                  redis-rate-limiter.burstCapacity: 20
+                  redis-rate-limiter.requestedTokens: 1
+                  key-resolver: "#{@ipKeyResolver}"
+
+        - id: order-service
+          uri: lb://order-service
+          predicates:
+              - Path=/api/v1/orders/**
+          metadata:
+              # One order triggers several internal calls, so allow the gateway to wait
+              # LONGER than the Order Service's own per-call timeouts.
+              response-timeout: 10000
+              connect-timeout: 2000
+          filters:
+              - name: RequestRateLimiter
+                args:
+                  redis-rate-limiter.replenishRate: 5
+                  redis-rate-limiter.burstCapacity: 10
+                  redis-rate-limiter.requestedTokens: 1
+                  key-resolver: "#{@ipKeyResolver}"
+
 # Our own settings, read by GatewaySecurityConfig. Comma-separated list of origins
 # (web pages) allowed to call the API from a browser.
 gateway:

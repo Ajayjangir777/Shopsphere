@@ -52,4 +52,19 @@ public class RateLimiterConfig {
                 .orElse("unknown"));
     }
 
+    /**
+     * Rate-limit key for authenticated routes: one bucket per user (the token's subject).
+     * Falls back to the IP for the rare unauthenticated request. Possible now because the
+     * security chain has already run when this resolver is called.
+     */
+    @Bean
+    public KeyResolver userKeyResolver() {
+        return exchange -> exchange.getPrincipal()
+                .map(principal -> "user:" + principal.getName())
+                .switchIfEmpty(Mono.fromSupplier(() -> "ip:" + Optional
+                        .ofNullable(exchange.getRequest().getRemoteAddress())
+                        .map(address -> address.getAddress().getHostAddress())
+                        .orElse("unknown")));
+    }
+
 }
