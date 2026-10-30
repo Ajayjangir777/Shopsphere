@@ -11,6 +11,8 @@ import com.shopsphere.order.feignClient.AddressDto;
 import com.shopsphere.order.feignClient.ProductClient;
 import com.shopsphere.order.feignClient.ProductDto;
 import com.shopsphere.order.feignClient.UserClient;
+import com.shopsphere.order.integration.AddressLookup;
+import com.shopsphere.order.integration.ProductLookup;
 import com.shopsphere.order.repository.OrderRepository;
 import feign.FeignException;
 import feign.Request;
@@ -46,9 +48,9 @@ class OrderServiceTest {
     @Mock
     OrderRepository orderRepository;
     @Mock
-    ProductClient productClient;
+    ProductLookup productLookup;
     @Mock
-    UserClient userClient;
+    AddressLookup addressLookup;
     @InjectMocks
     OrderService service;
 
@@ -59,9 +61,9 @@ class OrderServiceTest {
     /** Totals come from the Product Service's prices, and the address is copied into the order. */
     @Test
     void create_usesServerSidePricesAndSnapshotsAddress() {
-        when(userClient.getMyAddress(addressId)).thenReturn(address());
-        when(productClient.getById(phoneId)).thenReturn(new ProductDto(phoneId, "Phone", new BigDecimal("100.00"), 10));
-        when(productClient.getById(caseId)).thenReturn(new ProductDto(caseId, "Case", new BigDecimal("50.50"), 10));
+        when(addressLookup.getMyAddress(addressId)).thenReturn(address());
+        when(productLookup.getById(phoneId)).thenReturn(new ProductDto(phoneId, "Phone", new BigDecimal("100.00"), 10));
+        when(productLookup.getById(caseId)).thenReturn(new ProductDto(caseId, "Case", new BigDecimal("50.50"), 10));
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         OrderResponse response = service.create("alice", request(item(phoneId, 2), item(caseId, 1)));
@@ -76,48 +78,22 @@ class OrderServiceTest {
         assertThat(saved.getValue().getOwnerSub()).isEqualTo("alice");
     }
 
-    /** An unknown product is a client error (422) and nothing is saved. */
-    @Test
-    void create_rejectsUnknownProduct() {
-        when(userClient.getMyAddress(addressId)).thenReturn(address());
-        when(productClient.getById(phoneId)).thenThrow(feignError(404));
-
-        assertStatus(() -> service.create("alice", request(item(phoneId, 1))), HttpStatus.UNPROCESSABLE_ENTITY);
-        verify(orderRepository, never()).save(any());
-    }
-
-    /** An address that is missing or not the caller's comes back as 404 from the User Service, then 422 here. */
-    @Test
-    void create_rejectsAddressNotOwnedByCaller() {
-        when(userClient.getMyAddress(addressId)).thenThrow(feignError(404));
-
-        assertStatus(() -> service.create("alice", request(item(phoneId, 1))), HttpStatus.UNPROCESSABLE_ENTITY);
-        verifyNoInteractions(productClient);
-    }
 
     /** Asking for more than the stock is a conflict (409). */
     @Test
     void create_rejectsInsufficientStock() {
-        when(userClient.getMyAddress(addressId)).thenReturn(address());
-        when(productClient.getById(phoneId)).thenReturn(new ProductDto(phoneId, "Phone", new BigDecimal("100.00"), 1));
+        when(addressLookup.getMyAddress(addressId)).thenReturn(address());
+        when(productLookup.getById(phoneId)).thenReturn(new ProductDto(phoneId, "Phone", new BigDecimal("100.00"), 1));
 
         assertStatus(() -> service.create("alice", request(item(phoneId, 2))), HttpStatus.CONFLICT);
     }
 
-    /** A failing dependency becomes 503, not an unexplained 500. */
-    @Test
-    void create_whenProductServiceFails_returns503() {
-        when(userClient.getMyAddress(addressId)).thenReturn(address());
-        when(productClient.getById(phoneId)).thenThrow(feignError(500));
-
-        assertStatus(() -> service.create("alice", request(item(phoneId, 1))), HttpStatus.SERVICE_UNAVAILABLE);
-    }
 
     /** The same product twice is rejected before any remote call is made. */
     @Test
     void create_rejectsDuplicateProducts() {
         assertStatus(() -> service.create("alice", request(item(phoneId, 1), item(phoneId, 2))), HttpStatus.BAD_REQUEST);
-        verifyNoInteractions(userClient, productClient);
+        verifyNoInteractions(addressLookup, productLookup);
     }
 
     /** Another user's order id looks exactly like a missing one. */
@@ -147,19 +123,29 @@ class OrderServiceTest {
         assertStatus(() -> service.cancel("alice", id), HttpStatus.CONFLICT);
     }
 
+    /** If the product lookup fails (e.g. circuit open), the error is passed on and nothing is saved. */
+    @Test
+    void create_whenProductLookupFails_savesNothing() {
+        when(addressLookup.getMyAddress(addressId)).thenReturn(address());
+        when(productLookup.getById(phoneId)).thenThrow(ApiException.unavailable("Product service is temporarily unavailable"));
+
+        assertStatus(() -> service.create("alice", request(item(phoneId, 1))), HttpStatus.SERVICE_UNAVAILABLE);
+        verify(orderRepository, never()).save(any());
+    }
+
+    /** If the address is invalid, products are never even looked up. */
+    @Test
+    void create_whenAddressLookupFails_skipsProductCalls() {
+        when(addressLookup.getMyAddress(addressId)).thenThrow(ApiException.unprocessable("Address not found"));
+
+        assertStatus(() -> service.create("alice", request(item(phoneId, 1))), HttpStatus.UNPROCESSABLE_ENTITY);
+        verifyNoInteractions(productLookup);
+    }
+
     /** Asserts that the call throws an ApiException with the expected status. */
     private static void assertStatus(ThrowableAssert.ThrowingCallable call, HttpStatus expected) {
         assertThatThrownBy(call).isInstanceOfSatisfying(ApiException.class,
                 ex -> assertThat(ex.getStatus()).isEqualTo(expected));
-    }
-
-    /** Builds a FeignException as the client would throw it for the given HTTP status. */
-    private static FeignException feignError(int status) {
-        Request request = Request.create(Request.HttpMethod.GET, "http://service/x", Map.of(), null,
-                StandardCharsets.UTF_8, null);
-        Response response = Response.builder().status(status).reason("test").request(request)
-                .headers(Map.of()).build();
-        return FeignException.errorStatus("Client#method", response);
     }
 
     private CreateOrderRequest request(CreateOrderRequest.Item... items) {
@@ -169,6 +155,7 @@ class OrderServiceTest {
     private static CreateOrderRequest.Item item(UUID productId, int quantity) {
         return new CreateOrderRequest.Item(productId, quantity);
     }
+
 
     private static AddressDto address() {
         return new AddressDto(UUID.randomUUID(), "Test User", "12 Main Road", null, "Pune", "Maharashtra",

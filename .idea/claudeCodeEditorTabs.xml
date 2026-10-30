@@ -1,22 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="d4ef405f-0aa4-48da-bf77-f01c09dda801" />
+    <option name="activeSessionId" value="5761889a-3087-4a3c-ae90-036bf8927d1e" />
     <option name="openSessionIds">
       <list>
         <option value="0c938d4e-e5f3-4293-ae42-fabf796f3cd2" />
         <option value="d4ef405f-0aa4-48da-bf77-f01c09dda801" />
+        <option value="5761889a-3087-4a3c-ae90-036bf8927d1e" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
         <entry key="0c938d4e-e5f3-4293-ae42-fabf796f3cd2" value="/sessions/4fc1a7b7-c735-425f-ae99-abccbaf56bbe" />
+        <entry key="5761889a-3087-4a3c-ae90-036bf8927d1e" value="/sessions/b06fdc55-1f61-44f1-8196-7e00eb198aad" />
         <entry key="d4ef405f-0aa4-48da-bf77-f01c09dda801" value="/sessions/b06fdc55-1f61-44f1-8196-7e00eb198aad" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
         <entry key="0c938d4e-e5f3-4293-ae42-fabf796f3cd2" value="could you please check i am running api through po" />
+        <entry key="5761889a-3087-4a3c-ae90-036bf8927d1e" value="@order-service/src/test/java/service/OrderServiceT" />
         <entry key="d4ef405f-0aa4-48da-bf77-f01c09dda801" value="@order-service/src/test/java/service/OrderServiceT" />
       </map>
     </option>

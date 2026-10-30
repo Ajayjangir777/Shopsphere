@@ -1,0 +1,12 @@
+{
+  "productService": {
+    "state": "CLOSED",
+    "failureRate": "20.0%",
+    "notPermittedCalls": 0
+  },
+  "userService": {
+    "state": "CLOSED",
+    "failureRate": "0.0%",
+    "notPermittedCalls": 0
+  }
+}

@@ -29,12 +29,21 @@ public class CommonExceptionAdvice extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(CommonExceptionAdvice.class);
 
-    /** Our deliberate errors: status and message come from the exception itself. */
+    /**
+     * Our deliberate errors: status and message come from the exception itself.
+     * For 503 we also send a Retry-After header, the standard way to tell clients how long
+     * to back off before trying again (a hint, not a guarantee).
+     */
     @ExceptionHandler(ApiException.class)
-    public ProblemDetail handleApiException(ApiException ex) {
+    public ResponseEntity<ProblemDetail> handleApiException(ApiException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage());
         problem.setTitle(ex.getStatus().getReasonPhrase());
-        return problem;
+
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(ex.getStatus());
+        if (ex.getStatus() == HttpStatus.SERVICE_UNAVAILABLE) {
+            response.header(HttpHeaders.RETRY_AFTER, "5");
+        }
+        return response.body(problem);
     }
 
     /** A @PreAuthorize check failed inside a controller: 403. */

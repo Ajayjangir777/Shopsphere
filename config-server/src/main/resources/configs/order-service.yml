@@ -1,10 +1,11 @@
 server:
   port: 8083
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/order_db
     username: postgres
-    password: root            # DEV ONLY
+    password: root         # DEV ONLY
   jpa:
     hibernate:
       ddl-auto: validate
@@ -20,11 +21,63 @@ spring:
     openfeign:
       client:
         config:
-          default:                  # applies to every Feign client
-            connect-timeout: 2000   # ms to open a connection
-            read-timeout: 4000      # ms to wait for a response
-            logger-level: basic     # log method, URL, status, duration
+          default:
+            connect-timeout: 500     # ms to open a connection (was 2000)
+            read-timeout: 2000       # ms to wait for the answer (was 4000)
+            logger-level: basic
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Resilience state, readable at /actuator/circuitbreakers etc.
+        # They require a valid token (SecurityConfig). Lock them to admins in production.
+        include: health,info,circuitbreakers,circuitbreakerevents,retries,retryevents,bulkheads,metrics
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED          # judge the last N calls
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5                 # no verdict before 5 calls have been recorded
+        failureRateThreshold: 50                # open at >= 50% failures
+        slowCallDurationThreshold: 1s           # a call slower than this counts as "slow"
+        slowCallRateThreshold: 80               # open at >= 80% slow calls
+        waitDurationInOpenState: 15s            # stay open this long (short for experiments; 30-60s is typical)
+        automaticTransitionFromOpenToHalfOpenEnabled: true   # move to HALF_OPEN by itself after the wait
+        permittedNumberOfCallsInHalfOpenState: 3             # probe calls allowed in HALF_OPEN
+        # Which exceptions count as failures (network/5xx yes, 4xx business answers no)
+        recordFailurePredicate: com.shopsphere.order.integration.DependencyFailurePredicate
+    instances:
+      productService:
+        baseConfig: default
+      userService:
+        baseConfig: default
+
+  retry:
+    configs:
+      default:
+        maxAttempts: 2                          # the first try plus ONE retry
+        waitDuration: 200ms
+        retryExceptionPredicate: com.shopsphere.order.integration.DependencyFailurePredicate
+    instances:
+      productService:
+        baseConfig: default
+      userService:
+        baseConfig: default
+
+  bulkhead:
+    configs:
+      default:
+        maxConcurrentCalls: 10                  # at most 10 simultaneous calls per dependency
+        maxWaitDuration: 0                      # no queueing: reject immediately when full
+    instances:
+      productService:
+        baseConfig: default
+      userService:
+        baseConfig: default
+
 logging:
   level:
-    com.shopsphere.order.client: DEBUG   # makes the Feign log lines visible
-    org.hibernate.SQL: debug
+    com.shopsphere.order.client: DEBUG

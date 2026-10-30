@@ -13,12 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 public class CommonExceptionAdviceTest {
 
@@ -62,6 +60,14 @@ public class CommonExceptionAdviceTest {
                 .andExpect(content().string(not(containsString("secret internal detail"))));
     }
 
+    /** A 503 must tell clients when to retry. */
+    @Test
+    void serviceUnavailable_includesRetryAfter() throws Exception {
+        mockMvc.perform(get("/unavailable"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string("Retry-After", "5"));
+    }
+
     /** Minimal controller that triggers each case. */
     @RestController
     static class TestController {
@@ -70,5 +76,6 @@ public class CommonExceptionAdviceTest {
         @PostMapping("/echo") String echo(@Valid @RequestBody Body body) { return "ok"; }
         @GetMapping("/conflict") void conflict() { throw ApiException.conflict("taken"); }
         @GetMapping("/boom") void boom() { throw new IllegalStateException("secret internal detail"); }
+        @GetMapping("/unavailable") void unavailable() { throw ApiException.unavailable("down"); }
     }
 }

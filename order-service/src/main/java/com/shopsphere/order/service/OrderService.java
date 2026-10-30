@@ -13,6 +13,8 @@ import com.shopsphere.order.feignClient.AddressDto;
 import com.shopsphere.order.feignClient.ProductClient;
 import com.shopsphere.order.feignClient.ProductDto;
 import com.shopsphere.order.feignClient.UserClient;
+import com.shopsphere.order.integration.AddressLookup;
+import com.shopsphere.order.integration.ProductLookup;
 import com.shopsphere.order.repository.OrderRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
@@ -35,10 +37,10 @@ import java.util.*;
 @RequiredArgsConstructor
 public class OrderService {
 
+    // Fields: replace ProductClient / UserClient with the resilient wrappers
     private final OrderRepository orderRepository;
-    private final ProductClient productClient;
-    private final UserClient userClient;
-
+    private final ProductLookup productLookup;
+    private final AddressLookup addressLookup;
     /**
      * Places an order for the caller.
      *
@@ -52,12 +54,12 @@ public class OrderService {
      */
     public OrderResponse create(String ownerSub, CreateOrderRequest request) {
         rejectDuplicateProducts(request);
-        AddressDto address = fetchAddress(request.addressId());
+        AddressDto address = addressLookup.getMyAddress(request.addressId());
 
         List<OrderItem> items = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
         for (CreateOrderRequest.Item requested : request.items()) {
-            ProductDto product = fetchProduct(requested.productId());
+            ProductDto product = productLookup.getById(requested.productId());
             // Advisory only: another order may take the stock a moment later.
             // Real reservation comes with the Saga step.
             if (product.stock() < requested.quantity()) {
@@ -119,30 +121,6 @@ public class OrderService {
         }
     }
 
-    /** Calls the User Service with the caller's token; translates failures into our own errors. */
-    private AddressDto fetchAddress(UUID addressId) {
-        try {
-            return userClient.getMyAddress(addressId);
-        } catch (FeignException.NotFound ex) {
-            // Same answer whether it does not exist or belongs to someone else: no information leak.
-            throw ApiException.unprocessable("Address not found: " + addressId);
-        } catch (FeignException ex) {
-            log.warn("User service call failed: status={}", ex.status());
-            throw ApiException.unavailable("User service is unavailable, please retry");
-        }
-    }
-
-    /** Calls the Product Service; translates failures into our own errors. */
-    private ProductDto fetchProduct(UUID productId) {
-        try {
-            return productClient.getById(productId);
-        } catch (FeignException.NotFound ex) {
-            throw ApiException.unprocessable("Product not found: " + productId);
-        } catch (FeignException ex) {
-            log.warn("Product service call failed: status={}", ex.status());
-            throw ApiException.unavailable("Product service is unavailable, please retry");
-        }
-    }
 
     /** Copies the address into the order so later address edits never change old orders. */
     private ShippingAddress snapshot(AddressDto a) {
